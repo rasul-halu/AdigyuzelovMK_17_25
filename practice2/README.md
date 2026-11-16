@@ -57,6 +57,24 @@ python -m unittest discover -s tests -t .
 (`.bat`), файлы с ошибками лежат в `configs/errors/`.
 
 
+## Этап 2. Сбор данных
+
+Модуль `src/npm_registry.py`. Метаданные пакета скачиваются запросом
+`GET <repository>/<имя>` (для `@scope/name` — `@scope%2fname`) с
+заголовком `Accept: application/vnd.npm.install-v1+json` — это
+сокращённый формат, который использует сам npm. Из ответа берутся
+`dist-tags` и `versions[<версия>].dependencies`.
+
+Учитываются только `dependencies` — то, что устанавливается вместе
+с пакетом (`devDependencies` нужны лишь при разработке самого пакета).
+Ошибки: пакет не найден (404), нет такой версии, сеть недоступна,
+ответ — не JSON.
+
+```
+scripts/stage2.sh          # прямые зависимости express, chalk, axios
+```
+
+
 ## Структура проекта
 
 ```

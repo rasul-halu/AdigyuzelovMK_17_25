@@ -7,6 +7,7 @@ import argparse
 import sys
 
 from config import ConfigError, load_config
+from npm_registry import NpmRegistry, RepoError
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -24,23 +25,26 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def format_value(value):
-    """Значение параметра для вывода."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)
+def run(args):
+    """Выводит прямые зависимости пакета из npm-репозитория."""
+    config = load_config(args.config)
+    if config.test_mode:
+        raise RepoError("тестовый режим пока не поддерживается (этап 3)")
+    registry = NpmRegistry(config.repository)
+    version, deps = registry.direct_dependencies(config.package, config.version)
+    print(f"Прямые зависимости {config.package}@{version}: {len(deps)}")
+    for name, spec in deps.items():
+        print(f"  {name}: {spec}")
 
 
 def main(argv=None):
     """Точка входа, возвращает код завершения."""
     args = parse_args(argv)
     try:
-        config = load_config(args.config)
-    except ConfigError as error:
+        run(args)
+    except (ConfigError, RepoError) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return EXIT_ERROR
-    for key, value in config.items():
-        print(f"{key}={format_value(value)}")
     return EXIT_OK
 
 
