@@ -10,6 +10,7 @@ from config import ConfigError, load_config
 from graph import build_graph, find_cycles, load_order
 from npm_registry import NpmRegistry, RepoError
 from test_repo import TestRepository
+from visualize import DiagramError, ascii_tree, render_svg, to_dot
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -70,6 +71,15 @@ def print_load_order(graph):
         print(f"  {number}. {node}")
 
 
+def draw(config, graph, cycles):
+    """Печатает DOT-текст и сохраняет изображение графа в SVG."""
+    text = to_dot(graph, cycles)
+    print("Graphviz (DOT):")
+    print(text, end="")
+    dot_path = render_svg(text, config.output_file)
+    print(f"Сохранено: {dot_path}, {config.output_file}")
+
+
 def run(args):
     """Основная логика; исключения обрабатываются в main."""
     config = load_config(args.config)
@@ -79,6 +89,11 @@ def run(args):
     print_graph(graph, cycles)
     if args.load_order:
         print_load_order(graph)
+    if config.ascii_tree:
+        print("ASCII-дерево:")
+        for line in ascii_tree(graph):
+            print(line)
+    draw(config, graph, cycles)
 
 
 def main(argv=None):
@@ -86,7 +101,7 @@ def main(argv=None):
     args = parse_args(argv)
     try:
         run(args)
-    except (ConfigError, RepoError) as error:
+    except (ConfigError, RepoError, DiagramError) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return EXIT_ERROR
     return EXIT_OK

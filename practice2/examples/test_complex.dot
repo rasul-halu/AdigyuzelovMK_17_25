@@ -1,0 +1,30 @@
+digraph dependencies {
+    rankdir=LR;
+    node [shape=box, style="rounded,filled", fillcolor=white, fontname="Helvetica"];
+    edge [color="#555555"];
+    "A" [fillcolor="#ffe699", penwidth=2];
+    "B";
+    "C";
+    "D";
+    "E";
+    "F";
+    "G";
+    "H";
+    "I";
+    "J";
+    "K";
+    "A" -> "B";
+    "A" -> "C";
+    "B" -> "D" [color=red, penwidth=2];
+    "B" -> "E";
+    "C" -> "E";
+    "C" -> "F";
+    "D" -> "B" [color=red, penwidth=2];
+    "D" -> "G";
+    "E" -> "E" [color=red, penwidth=2];
+    "E" -> "H";
+    "F" -> "H";
+    "F" -> "I";
+    "I" -> "J";
+    "J" -> "K";
+}
