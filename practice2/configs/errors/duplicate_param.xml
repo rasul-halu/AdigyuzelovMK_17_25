@@ -1,0 +1,4 @@
+<config>
+    <package>express</package>
+    <package>react</package>
+</config>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <!-- Имя анализируемого пакета -->
+    <package>axios</package>
+    <!-- URL npm-репозитория или путь к файлу тестового репозитория -->
+    <repository>https://registry.npmjs.org</repository>
+    <!-- Режим работы с тестовым репозиторием: true / false -->
+    <test_mode>false</test_mode>
+    <!-- Версия пакета (SemVer или latest) -->
+    <version>1.6.0</version>
+    <!-- Имя файла с изображением графа (SVG) -->
+    <output_file>output/axios.svg</output_file>
+    <!-- Вывод зависимостей в виде ASCII-дерева: true / false -->
+    <ascii_tree>true</ascii_tree>
+    <!-- Максимальная глубина анализа зависимостей -->
+    <max_depth>5</max_depth>
+</config>

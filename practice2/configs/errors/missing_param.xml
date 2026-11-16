@@ -1,0 +1,8 @@
+<config>
+    <package>express</package>
+    <repository>https://registry.npmjs.org</repository>
+    <test_mode>false</test_mode>
+    <version>1.0.0</version>
+    <output_file>output/x.svg</output_file>
+    <ascii_tree>false</ascii_tree>
+</config>
