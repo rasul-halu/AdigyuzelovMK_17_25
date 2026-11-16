@@ -1,7 +1,7 @@
 import unittest
 
 from tests.helpers import data_path, fake_fetch
-from graph import build_graph, find_cycles
+from graph import build_graph, find_cycles, load_order
 from npm_registry import NpmRegistry, RepoError
 from test_repo import TestRepository, parse_graph
 
@@ -45,6 +45,19 @@ class GraphTest(unittest.TestCase):
         self.assertEqual(find_cycles(graph), [["A", "B", "C", "A"]])
         graph = build_graph(repo("graph_complex.txt"), "A", 10)
         self.assertEqual(find_cycles(graph), [["B", "D", "B"], ["E", "E"]])
+
+    def test_load_order(self):
+        graph = build_graph(repo("graph_simple.txt"), "A", 10)
+        self.assertEqual(load_order(graph), ["D", "B", "C", "A"])
+        graph = build_graph(repo("graph_cycle.txt"), "A", 10)
+        self.assertEqual(load_order(graph), ["D", "C", "B", "A"])
+        graph = build_graph(repo("graph_complex.txt"), "A", 10)
+        order = load_order(graph)
+        self.assertEqual(order[-1], "A")
+        for node, children in graph.edges.items():
+            for child in children:
+                if child != node and not (node, child) == ("D", "B"):
+                    self.assertLess(order.index(child), order.index(node))
 
     def test_npm_graph_with_cycle(self):
         registry = NpmRegistry("https://r", fetch=fake_fetch)

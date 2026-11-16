@@ -1,13 +1,13 @@
 """Визуализатор графа зависимостей npm-пакетов (вариант 1).
 
-Запуск: python src/main.py [config.xml]
+Запуск: python src/main.py [config.xml] [--load-order]
 """
 
 import argparse
 import sys
 
 from config import ConfigError, load_config
-from graph import build_graph, find_cycles
+from graph import build_graph, find_cycles, load_order
 from npm_registry import NpmRegistry, RepoError
 from test_repo import TestRepository
 
@@ -23,6 +23,10 @@ def parse_args(argv=None):
     parser.add_argument(
         "config", nargs="?", default="config.xml",
         help="конфигурационный XML-файл (по умолчанию config.xml)",
+    )
+    parser.add_argument(
+        "--load-order", action="store_true",
+        help="вывести порядок загрузки зависимостей",
     )
     return parser.parse_args(argv)
 
@@ -58,6 +62,14 @@ def print_graph(graph, cycles):
         print(f"Предупреждение: {warning}", file=sys.stderr)
 
 
+def print_load_order(graph):
+    """Печатает порядок загрузки (зависимости раньше зависящих)."""
+    order = load_order(graph)
+    print("Порядок загрузки зависимостей:")
+    for number, node in enumerate(order, start=1):
+        print(f"  {number}. {node}")
+
+
 def run(args):
     """Основная логика; исключения обрабатываются в main."""
     config = load_config(args.config)
@@ -65,6 +77,8 @@ def run(args):
     graph = build_graph(source, root, config.max_depth)
     cycles = find_cycles(graph)
     print_graph(graph, cycles)
+    if args.load_order:
+        print_load_order(graph)
 
 
 def main(argv=None):
