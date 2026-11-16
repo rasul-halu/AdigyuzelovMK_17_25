@@ -4,7 +4,8 @@ import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from tests.helpers import FAKE_PACKAGES, fake_fetch
-from npm_registry import NpmRegistry, RepoError, http_get_json, package_url
+from npm_registry import (NpmRegistry, RepoError, http_get_json, package_url,
+                          split_alias, split_node)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -35,15 +36,29 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(version, "2.0.0")
         self.assertEqual(list(deps), ["lib-a", "lib-b"])
 
+    def test_resolve_prefers_latest_tag(self):
+        self.assertEqual(self.registry.resolve("lib-c", "*"), "2.1.0")
+        self.assertEqual(self.registry.resolve("lib-c", "^1.0.0"), "1.0.0")
+        self.assertEqual(self.registry.resolve("lib-b", "~2.0.0"), "2.0.5")
+
     def test_errors(self):
         with self.assertRaises(RepoError):
             self.registry.direct_dependencies("no-such", "1.0.0")
         with self.assertRaises(RepoError):
             self.registry.direct_dependencies("app", "9.9.9")
+        with self.assertRaises(RepoError):
+            self.registry.resolve("lib-c", "^9")
+
+    def test_children(self):
+        children, warnings = self.registry.children("app@2.0.0")
+        self.assertEqual(children, ["lib-a@1.2.0", "lib-b@2.0.5"])
+        self.assertEqual(warnings, [])
 
     def test_helpers(self):
         self.assertEqual(package_url("https://r.org/", "@types/node"),
                          "https://r.org/@types%2Fnode")
+        self.assertEqual(split_alias("x", "npm:lib-a@^1"), ("lib-a", "^1"))
+        self.assertEqual(split_node("@s/p@1.0.0"), ("@s/p", "1.0.0"))
 
     def test_http(self):
         server = HTTPServer(("127.0.0.1", 0), Handler)

@@ -7,14 +7,16 @@ import argparse
 import sys
 
 from config import ConfigError, load_config
+from graph import build_graph, find_cycles
 from npm_registry import NpmRegistry, RepoError
+from test_repo import TestRepository
 
 EXIT_OK = 0
 EXIT_ERROR = 1
 
 
 def parse_args(argv=None):
-    """Аргументы командной строки: путь к конфигурации."""
+    """Аргументы командной строки: путь к конфигурации и режимы."""
     parser = argparse.ArgumentParser(
         description="Визуализатор графа зависимостей npm-пакетов."
     )
@@ -25,16 +27,44 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def run(args):
-    """Выводит прямые зависимости пакета из npm-репозитория."""
-    config = load_config(args.config)
+def open_source(config):
+    """Источник зависимостей и корневой узел графа."""
     if config.test_mode:
-        raise RepoError("тестовый режим пока не поддерживается (этап 3)")
-    registry = NpmRegistry(config.repository)
-    version, deps = registry.direct_dependencies(config.package, config.version)
-    print(f"Прямые зависимости {config.package}@{version}: {len(deps)}")
-    for name, spec in deps.items():
-        print(f"  {name}: {spec}")
+        source = TestRepository(config.repository)
+        if not source.has(config.package):
+            raise RepoError(f"пакет '{config.package}' не найден в тестовом репозитории")
+        return source, config.package
+    source = NpmRegistry(config.repository)
+    version = source.resolve(config.package, config.version)
+    return source, f"{config.package}@{version}"
+
+
+def print_graph(graph, cycles):
+    """Печатает узлы, рёбра и циклы графа."""
+    print(
+        f"Граф зависимостей {graph.root}: узлов {len(graph.edges)}, "
+        f"рёбер {graph.edge_count()}"
+    )
+    for node, children in graph.edges.items():
+        mark = " (не раскрыт: max_depth)" if node in graph.truncated else ""
+        print(f"  [{graph.depth[node]}] {node} -> {', '.join(children) or '-'}{mark}")
+    if cycles:
+        print(f"Циклические зависимости: {len(cycles)}")
+        for cycle in cycles:
+            print("  " + " -> ".join(cycle))
+    else:
+        print("Циклические зависимости: нет")
+    for warning in graph.warnings:
+        print(f"Предупреждение: {warning}", file=sys.stderr)
+
+
+def run(args):
+    """Основная логика; исключения обрабатываются в main."""
+    config = load_config(args.config)
+    source, root = open_source(config)
+    graph = build_graph(source, root, config.max_depth)
+    cycles = find_cycles(graph)
+    print_graph(graph, cycles)
 
 
 def main(argv=None):

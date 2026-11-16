@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <!-- Имя анализируемого пакета -->
+    <package>A</package>
+    <!-- URL npm-репозитория или путь к файлу тестового репозитория -->
+    <repository>data/graph_complex.txt</repository>
+    <!-- Режим работы с тестовым репозиторием: true / false -->
+    <test_mode>true</test_mode>
+    <!-- Версия пакета (SemVer или latest) -->
+    <version>1.0.0</version>
+    <!-- Имя файла с изображением графа (SVG) -->
+    <output_file>output/test_complex.svg</output_file>
+    <!-- Вывод зависимостей в виде ASCII-дерева: true / false -->
+    <ascii_tree>true</ascii_tree>
+    <!-- Максимальная глубина анализа зависимостей -->
+    <max_depth>10</max_depth>
+</config>

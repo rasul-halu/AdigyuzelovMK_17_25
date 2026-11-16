@@ -10,10 +10,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from semver import RangeError, max_satisfying
+
 # Сокращённый формат метаданных: только то, что нужно для установки.
 ACCEPT = "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8"
 TIMEOUT = 30
-
+# Префиксы спецификаций, которые не являются версиями из репозитория.
+NOT_REGISTRY = (
+    "file:", "link:", "git:", "git+", "github:", "gitlab:", "bitbucket:",
+    "http:", "https:", "workspace:", "portal:",
+)
 
 
 class RepoError(Exception):
@@ -45,6 +51,17 @@ def package_url(repository, name):
     return repository.rstrip("/") + "/" + quote(name, safe="@")
 
 
+def split_alias(name, spec):
+    """Разворачивает псевдоним 'npm:real-name@range' в (имя, диапазон)."""
+    if not spec.startswith("npm:"):
+        return name, spec
+    target = spec[len("npm:"):]
+    at = target.rfind("@")
+    if at > 0:
+        return target[:at], target[at + 1:]
+    return target, "*"
+
+
 class NpmRegistry:
     """Доступ к npm-репозиторию с кэшем метаданных пакетов."""
 
@@ -62,15 +79,30 @@ class NpmRegistry:
             self.cache[name] = data
         return self.cache[name]
 
-    def resolve(self, name, version):
-        """Точная версия пакета: метка (latest) раскрывается по dist-tags."""
+    def resolve(self, name, spec):
+        """Выбирает точную версию пакета по диапазону, как это делает npm.
+
+        Если метка latest удовлетворяет диапазону, берётся она, иначе —
+        наибольшая подходящая версия. Метка (latest, next) тоже допустима.
+        """
         data = self.packument(name)
+        versions = data["versions"]
         tags = data.get("dist-tags") or {}
-        if version in tags:
-            return tags[version]
-        if version not in data["versions"]:
-            raise RepoError(f"у пакета '{name}' нет версии {version}")
-        return version
+        spec = spec.strip() or "*"
+        if spec in tags:
+            return tags[spec]
+        if spec in versions:
+            return spec
+        latest = tags.get("latest")
+        try:
+            if latest in versions and max_satisfying([latest], spec):
+                return latest
+            found = max_satisfying(versions.keys(), spec)
+        except RangeError as error:
+            raise RepoError(f"{name}: некорректный диапазон '{spec}': {error}") from error
+        if found is None:
+            raise RepoError(f"{name}: нет версии, подходящей под '{spec}'")
+        return found
 
     def dependencies(self, name, version):
         """Прямые зависимости точной версии: словарь имя -> диапазон."""
@@ -86,3 +118,29 @@ class NpmRegistry:
         """Версия пакета (latest раскрывается) и его прямые зависимости."""
         exact = self.resolve(name, version)
         return exact, self.dependencies(name, exact)
+
+    def children(self, node):
+        """Узлы-зависимости для узла 'имя@версия' и список предупреждений."""
+        name, version = split_node(node)
+        result = []
+        warnings = []
+        for dep_name, spec in self.dependencies(name, version).items():
+            real_name, real_spec = split_alias(dep_name, str(spec))
+            if real_spec.startswith(NOT_REGISTRY) or "/" in real_spec:
+                warnings.append(
+                    f"{node}: зависимость {dep_name}@{spec} не из репозитория, пропущена"
+                )
+                continue
+            try:
+                exact = self.resolve(real_name, real_spec)
+            except RepoError as error:
+                warnings.append(f"{node}: {error}")
+                continue
+            result.append(f"{real_name}@{exact}")
+        return result, warnings
+
+
+def split_node(node):
+    """'@scope/name@1.0.0' -> ('@scope/name', '1.0.0')."""
+    at = node.rfind("@")
+    return node[:at], node[at + 1:]
