@@ -8,6 +8,25 @@ ROOT_COLOR = "#ffe699"
 CYCLE_COLOR = "red"
 
 
+def find_dot():
+    """Путь к программе dot из Graphviz или None.
+
+    Сначала ищется переменная GRAPHVIZ_DOT и PATH, затем стандартные
+    каталоги установки в Windows (установщик Graphviz не всегда
+    добавляет себя в PATH).
+    """
+    candidates = [os.environ.get("GRAPHVIZ_DOT"), shutil.which("dot")]
+    for base in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        folder = os.environ.get(base)
+        if folder:
+            candidates.append(os.path.join(folder, "Graphviz", "bin", "dot.exe"))
+            candidates.append(os.path.join(folder, "Programs", "Graphviz", "bin", "dot.exe"))
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    return None
+
+
 class DiagramError(Exception):
     """Ошибка построения изображения."""
 
@@ -66,11 +85,12 @@ def render_svg(dot_text, svg_path):
             file.write(dot_text)
     except OSError as error:
         raise DiagramError(f"не удалось записать '{dot_path}': {error}") from error
-    program = shutil.which("dot")
+    program = find_dot()
     if program is None:
         raise DiagramError(
-            "не найдена программа dot из пакета Graphviz "
-            "(установите: winget install graphviz / apt install graphviz)"
+            "не найдена программа dot из пакета Graphviz. Установите: "
+            "winget install graphviz (Windows) / sudo apt install graphviz, "
+            "затем перезапустите терминал. DOT-текст сохранён в " + dot_path
         )
     result = subprocess.run(
         [program, "-Tsvg", dot_path, "-o", svg_path],

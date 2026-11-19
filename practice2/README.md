@@ -175,7 +175,8 @@ python src/main.py configs/test_complex.xml --load-order
 * Текст на языке Graphviz (DOT) выводится на экран и сохраняется рядом
   с изображением (`output/express.dot`). Корень закрашен, рёбра циклов —
   красные, узлы, не раскрытые из-за `max_depth`, — пунктирные.
-* SVG строит программа `dot` из Graphviz (`dot -Tsvg`). Установка:
+* SVG строит программа `dot` из Graphviz (`dot -Tsvg`). Программа ищет её
+  в PATH, в переменной `GRAPHVIZ_DOT` и в `C:\Program Files\Graphviz\bin`. Установка:
   `winget install graphviz` (Windows), `sudo apt install graphviz`.
 * При `<ascii_tree>true</ascii_tree>` выводится ASCII-дерево. Пометки:
   `(цикл)` — узел уже на пути от корня, `(см. выше)` — поддерево уже

@@ -6,7 +6,7 @@ import unittest
 from tests.helpers import data_path
 from graph import build_graph, find_cycles
 from test_repo import TestRepository
-from visualize import ascii_tree, render_svg, to_dot
+from visualize import ascii_tree, find_dot, render_svg, to_dot
 
 
 def graph_of(name, depth=10):
@@ -39,7 +39,22 @@ class VisualizeTest(unittest.TestCase):
         self.assertIn("    |-- E (см. выше)", lines)
         self.assertEqual(ascii_tree(graph_of("graph_deep.txt", 1)), ["A", "`-- B (...)"])
 
-    @unittest.skipUnless(shutil.which("dot"), "Graphviz не установлен")
+    def test_find_dot_env(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder)
+        fake = os.path.join(folder, "dot.exe")
+        open(fake, "w").close()
+        old = os.environ.get("GRAPHVIZ_DOT")
+        os.environ["GRAPHVIZ_DOT"] = fake
+        try:
+            self.assertEqual(find_dot(), fake)
+        finally:
+            if old is None:
+                del os.environ["GRAPHVIZ_DOT"]
+            else:
+                os.environ["GRAPHVIZ_DOT"] = old
+
+    @unittest.skipUnless(find_dot(), "Graphviz не установлен")
     def test_render_svg(self):
         folder = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, folder)
