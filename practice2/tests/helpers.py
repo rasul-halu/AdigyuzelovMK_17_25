@@ -1,14 +1,14 @@
-"""Общие функции для тестов: путь к src и фиктивный npm-репозиторий."""
+"""Общие функции для тестов: пути к файлам и фиктивный npm-репозиторий.
+
+FAKE_PACKAGES — метаданные npm: имя -> {"dist-tags", "versions"}.
+"""
 
 import os
-import sys
+
+from npm_registry import RepoError
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
-if SRC not in sys.path:
-    sys.path.insert(0, SRC)
 
-# Фиктивные метаданные npm: имя -> {"dist-tags", "versions"}.
 FAKE_PACKAGES = {
     "app": {
         "dist-tags": {"latest": "2.0.0"},
@@ -43,8 +43,6 @@ FAKE_PACKAGES = {
 
 def fake_fetch(url):
     """Подменяет HTTP-запрос: отдаёт метаданные из FAKE_PACKAGES."""
-    from npm_registry import RepoError
-
     name = url.rsplit("/", 1)[1].replace("%2f", "/").replace("%2F", "/")
     if name not in FAKE_PACKAGES:
         raise RepoError(f"не найдено в репозитории (404): {url}")

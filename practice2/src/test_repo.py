@@ -49,16 +49,22 @@ def parse_graph(text):
 
 
 class TestRepository:
-    """Источник зависимостей из файла тестового репозитория."""
+    """Источник зависимостей из файла тестового репозитория.
 
-    __test__ = False  # не путать с тестовым классом unittest/pytest
+    Атрибут __test__ = False не даёт средствам тестирования принять
+    класс за набор тестов из-за имени, начинающегося с Test.
+    """
+
+    __test__ = False
 
     def __init__(self, path):
+        """Читает и разбирает файл тестового репозитория."""
         try:
             with open(path, encoding="utf-8-sig") as file:
                 text = file.read()
         except (OSError, UnicodeDecodeError) as error:
-            raise RepoError(f"не удалось прочитать файл '{path}': {error}") from error
+            message = f"не удалось прочитать файл '{path}': {error}"
+            raise RepoError(message) from error
         self.graph = parse_graph(text)
 
     def has(self, name):

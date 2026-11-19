@@ -26,6 +26,7 @@ class Version:
     """Версия SemVer с правилами сравнения из спецификации."""
 
     def __init__(self, major, minor, patch, prerelease=()):
+        """Создаёт версию из частей и списка prerelease."""
         self.major = major
         self.minor = minor
         self.patch = patch
@@ -50,7 +51,7 @@ class Version:
         return (self.major, self.minor, self.patch)
 
     def _pre_key(self):
-        # Версия без prerelease старше любой prerelease-версии.
+        """Ключ prerelease: версия без него старше любой prerelease."""
         if not self.prerelease:
             return (1,)
         parts = []
@@ -66,24 +67,31 @@ class Version:
         return (self.core(), self._pre_key())
 
     def __eq__(self, other):
+        """Версии равны."""
         return self.key() == other.key()
 
     def __lt__(self, other):
+        """Версия младше другой."""
         return self.key() < other.key()
 
     def __le__(self, other):
+        """Версия не старше другой."""
         return self.key() <= other.key()
 
     def __gt__(self, other):
+        """Версия старше другой."""
         return self.key() > other.key()
 
     def __ge__(self, other):
+        """Версия не младше другой."""
         return self.key() >= other.key()
 
     def __hash__(self):
+        """Хэш по ключу сравнения."""
         return hash(self.key())
 
     def __str__(self):
+        """Строка вида 1.2.3-beta.1."""
         text = f"{self.major}.{self.minor}.{self.patch}"
         if self.prerelease:
             text += "-" + ".".join(self.prerelease)
@@ -91,12 +99,16 @@ class Version:
 
 
 class Comparator:
-    """Одно условие: оператор и версия, например >=1.2.0."""
+    """Одно условие: оператор и версия, например >=1.2.0.
+
+    explicit_pre — prerelease указан пользователем, а не добавлен
+    программой как граница вида X.Y.Z-0.
+    """
 
     def __init__(self, operator, version, explicit_pre=False):
+        """Создаёт условие."""
         self.operator = operator
         self.version = version
-        # Prerelease указан пользователем (а не добавлен как '-0').
         self.explicit_pre = explicit_pre
 
     def test(self, version):
@@ -181,29 +193,36 @@ def caret(major, minor, patch, pre):
     return [Comparator(">=", start, bool(pre)), Comparator("<", end)]
 
 
+def partial_bound(operator, major, minor):
+    """Условие для >, >=, <, <= с версией без patch ('1' или '1.2')."""
+    if operator == ">=":
+        return Comparator(">=", Version(major, minor or 0, 0))
+    if operator == "<":
+        return Comparator("<", lowest(major, minor or 0))
+    if operator == ">":
+        if minor is None:
+            return Comparator(">=", Version(major + 1, 0, 0))
+        return Comparator(">=", Version(major, minor + 1, 0))
+    if minor is None:
+        return Comparator("<", lowest(major + 1))
+    return Comparator("<", lowest(major, minor + 1))
+
+
 def compare_partial(operator, major, minor, patch, pre):
-    """Условия для >, >=, <, <=, = с частичной версией."""
+    """Условия для >, >=, <, <=, = с частичной версией.
+
+    '<*' и '>*' не допускают ни одной версии, '>=*' и '<=*' — любые.
+    """
     if operator == "=":
         return x_range(major, minor, patch, pre)
     if major is None:
         if operator in ("<", ">"):
-            # '<*' и '>*' не допускают ни одной версии.
             return [Comparator("<", lowest(0))]
         return [Comparator(">=", Version(0, 0, 0))]
     if patch is not None:
-        return [Comparator(operator, Version(major, minor, patch, pre), bool(pre))]
-    if operator == ">=":
-        return [Comparator(">=", Version(major, minor or 0, 0))]
-    if operator == "<":
-        return [Comparator("<", lowest(major, minor or 0))]
-    if operator == ">":
-        if minor is None:
-            return [Comparator(">=", Version(major + 1, 0, 0))]
-        return [Comparator(">=", Version(major, minor + 1, 0))]
-    # operator == "<="
-    if minor is None:
-        return [Comparator("<", lowest(major + 1))]
-    return [Comparator("<", lowest(major, minor + 1))]
+        version = Version(major, minor, patch, pre)
+        return [Comparator(operator, version, bool(pre))]
+    return [partial_bound(operator, major, minor)]
 
 
 def parse_comparator(token):
@@ -235,7 +254,8 @@ def hyphen(left, right):
     elif patch is None:
         result.append(Comparator("<", lowest(major, minor + 1)))
     else:
-        result.append(Comparator("<=", Version(major, minor, patch, pre), bool(pre)))
+        end = Version(major, minor, patch, pre)
+        result.append(Comparator("<=", end, bool(pre)))
     return result or [Comparator(">=", Version(0, 0, 0))]
 
 
@@ -258,6 +278,7 @@ class Range:
     """Диапазон версий npm: наборы условий, объединённые через ||."""
 
     def __init__(self, text):
+        """Разбирает строку диапазона."""
         self.text = text
         self.sets = []
         for part in text.split("||"):
@@ -273,12 +294,15 @@ class Range:
 
     @staticmethod
     def _set_test(comparators, version):
+        """Проверяет набор условий.
+
+        Prerelease-версия подходит, только если в наборе явно есть
+        prerelease той же тройки major.minor.patch.
+        """
         if not all(item.test(version) for item in comparators):
             return False
         if not version.prerelease:
             return True
-        # Prerelease подходит, только если в наборе явно есть prerelease
-        # той же тройки major.minor.patch.
         return any(
             item.explicit_pre and item.version.core() == version.core()
             for item in comparators
@@ -295,6 +319,8 @@ def max_satisfying(versions, range_text):
     best = None
     for text in versions:
         version = Version.parse(text)
-        if version and rng.test(version) and (best is None or version > best[0]):
+        if not version or not rng.test(version):
+            continue
+        if best is None or version > best[0]:
             best = (version, text)
     return best[1] if best else None

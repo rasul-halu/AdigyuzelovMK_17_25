@@ -1,3 +1,5 @@
+"""Тесты чтения и проверки XML-конфигурации."""
+
 import os
 import tempfile
 import unittest
@@ -23,7 +25,10 @@ GOOD = dict(
 
 
 class ConfigTest(unittest.TestCase):
+    """Проверка параметров конфигурации."""
+
     def load(self, text):
+        """Загружает конфигурацию из текста через временный файл."""
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False,
                                          encoding="utf-8") as file:
             file.write(text)
@@ -31,26 +36,31 @@ class ConfigTest(unittest.TestCase):
         return load_config(file.name)
 
     def load_values(self, **changes):
+        """Загружает шаблон с изменёнными значениями."""
         return self.load(TEMPLATE.format(**{**GOOD, **changes}))
 
     def assert_error(self, fragment, **changes):
+        """Проверяет, что загрузка падает с нужным сообщением."""
         with self.assertRaises(ConfigError) as context:
             self.load_values(**changes)
         self.assertIn(fragment, str(context.exception))
 
     def test_good_config(self):
+        """Корректная конфигурация читается полностью."""
         config = self.load_values()
         self.assertEqual(config.package, "express")
         self.assertFalse(config.test_mode)
         self.assertTrue(config.ascii_tree)
         self.assertEqual(config.max_depth, 3)
-        self.assertEqual([key for key, _ in config.items()][0], "package")
+        self.assertEqual(config.items()[0][0], "package")
 
     def test_scoped_name_and_latest(self):
+        """Имя с областью и метка latest допустимы."""
         config = self.load_values(package="@types/node", version="latest")
         self.assertEqual(config.package, "@types/node")
 
     def test_test_mode(self):
+        """Тестовый режим с путём к файлу."""
         config = self.load_values(
             package="A", repository=data_path("tests", "helpers.py"),
             test_mode="true",
@@ -58,19 +68,23 @@ class ConfigTest(unittest.TestCase):
         self.assertTrue(config.test_mode)
 
     def test_package_errors(self):
+        """Ошибки имени пакета."""
         self.assert_error("пустым", package="")
         self.assert_error("недопустимое имя", package="Express")
         self.assert_error("большие", package="a", test_mode="true",
                           repository=data_path("tests", "helpers.py"))
 
     def test_repository_errors(self):
+        """Ошибки URL и пути к файлу."""
         self.assert_error("некорректный URL", repository="registry.npmjs.org")
         self.assert_error("файл не найден", repository="nope.txt", package="A",
                           test_mode="true")
-        self.assert_error("не файл", repository=data_path("tests"), package="A",
+        self.assert_error("не файл", repository=data_path("tests"),
+                          package="A",
                           test_mode="true")
 
     def test_value_errors(self):
+        """Ошибки остальных параметров."""
         self.assert_error("<test_mode>", test_mode="maybe")
         self.assert_error("<version>", version="4.x")
         self.assert_error(".svg", output_file="graph.png")
@@ -80,13 +94,15 @@ class ConfigTest(unittest.TestCase):
         self.assert_error(">= 1", max_depth="0")
 
     def test_structure_errors(self):
+        """Ошибки структуры XML-файла."""
         with self.assertRaises(ConfigError):
             load_config("no_such_config.xml")
         for text, fragment in [
             ("<config><package>x</config>", "некорректный XML"),
             ("<settings/>", "корневой элемент"),
             ("<config><color/></config>", "неизвестный"),
-            ("<config><package>a</package><package>b</package></config>", "повторно"),
+            ("<config><package>a</package><package>b</package></config>",
+             "повторно"),
             ("<config><package>a</package></config>", "не задан"),
         ]:
             with self.assertRaises(ConfigError) as context:

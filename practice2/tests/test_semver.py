@@ -1,6 +1,7 @@
+"""Тесты сравнения версий и диапазонов SemVer."""
+
 import unittest
 
-import tests.helpers  # noqa: F401  (путь к src)
 from semver import Range, RangeError, Version, max_satisfying
 
 VERSIONS = ["0.0.1", "0.0.2", "0.1.0", "0.1.5", "0.2.0", "1.0.0", "1.2.3",
@@ -9,10 +10,14 @@ VERSIONS = ["0.0.1", "0.0.2", "0.1.0", "0.1.5", "0.2.0", "1.0.0", "1.2.3",
 
 
 class SemverTest(unittest.TestCase):
+    """Сравнение версий и выбор версии по диапазону."""
+
     def best(self, text):
+        """Наибольшая версия из VERSIONS для диапазона."""
         return max_satisfying(VERSIONS, text)
 
     def test_compare(self):
+        """Порядок версий, включая prerelease."""
         parse = Version.parse
         self.assertLess(parse("1.0.0-alpha"), parse("1.0.0"))
         self.assertLess(parse("1.0.0-alpha"), parse("1.0.0-alpha.1"))
@@ -21,6 +26,7 @@ class SemverTest(unittest.TestCase):
         self.assertIsNone(parse("1.0"))
 
     def test_ranges(self):
+        """Операторы ^, ~, x, сравнения, дефис и ||."""
         cases = {
             "^1.2.3": "1.9.9", "^0.1.0": "0.1.5", "^0.0.1": "0.0.1",
             "~1.2.3": "1.2.9", "~1": "1.9.9", "1.x": "1.9.9", "1.2": "1.2.9",
@@ -36,10 +42,13 @@ class SemverTest(unittest.TestCase):
                 self.assertEqual(self.best(text), expected)
 
     def test_prerelease_only_when_asked(self):
-        self.assertTrue(Range(">=2.0.0-beta.0 <2.0.0").test(Version.parse("2.0.0-beta.1")))
-        self.assertFalse(Range(">=1.0.0").test(Version.parse("2.0.0-beta.1")))
+        """Prerelease подходит только явно."""
+        beta = Version.parse("2.0.0-beta.1")
+        self.assertTrue(Range(">=2.0.0-beta.0 <2.0.0").test(beta))
+        self.assertFalse(Range(">=1.0.0").test(beta))
 
     def test_bad_range(self):
+        """Некорректный диапазон вызывает ошибку."""
         with self.assertRaises(RangeError):
             Range("abc")
         with self.assertRaises(RangeError):

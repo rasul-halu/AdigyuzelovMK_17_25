@@ -19,8 +19,10 @@ def find_dot():
     for base in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
         folder = os.environ.get(base)
         if folder:
-            candidates.append(os.path.join(folder, "Graphviz", "bin", "dot.exe"))
-            candidates.append(os.path.join(folder, "Programs", "Graphviz", "bin", "dot.exe"))
+            for sub in ("", "Programs"):
+                candidates.append(
+                    os.path.join(folder, sub, "Graphviz", "bin", "dot.exe")
+                )
     for path in candidates:
         if path and os.path.isfile(path):
             return path
@@ -84,7 +86,8 @@ def render_svg(dot_text, svg_path):
         with open(dot_path, "w", encoding="utf-8") as file:
             file.write(dot_text)
     except OSError as error:
-        raise DiagramError(f"не удалось записать '{dot_path}': {error}") from error
+        message = f"не удалось записать '{dot_path}': {error}"
+        raise DiagramError(message) from error
     program = find_dot()
     if program is None:
         raise DiagramError(
@@ -97,7 +100,9 @@ def render_svg(dot_text, svg_path):
         capture_output=True, text=True, check=False,
     )
     if result.returncode != 0:
-        raise DiagramError(f"Graphviz завершился с ошибкой: {result.stderr.strip()}")
+        raise DiagramError(
+            f"Graphviz завершился с ошибкой: {result.stderr.strip()}"
+        )
     return dot_path
 
 
@@ -111,6 +116,7 @@ def ascii_tree(graph):
     expanded = {graph.root}
 
     def walk(node, prefix, path):
+        """Выводит детей узла с нужным отступом."""
         children = graph.edges.get(node, [])
         for index, child in enumerate(children):
             last = index == len(children) - 1
@@ -125,7 +131,8 @@ def ascii_tree(graph):
             lines.append(prefix + branch + child + mark)
             if not mark and child not in expanded:
                 expanded.add(child)
-                walk(child, prefix + ("    " if last else "|   "), path | {child})
+                indent = "    " if last else "|   "
+                walk(child, prefix + indent, path | {child})
 
     walk(graph.root, "", {graph.root})
     return lines

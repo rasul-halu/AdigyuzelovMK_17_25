@@ -1,16 +1,20 @@
-"""Конфигурация приложения: чтение XML-файла и проверка параметров."""
+"""Конфигурация приложения: чтение XML-файла и проверка параметров.
+
+NPM_NAME — имя npm-пакета: строчные буквы, цифры, символы - . _ ~,
+возможно с областью @scope/. TEST_NAME — имя пакета тестового
+репозитория (большие латинские буквы). SEMVER — точная версия
+(1.2.3, 1.2.3-beta.1, 1.2.3+build). FIELDS — порядок параметров в файле
+и при выводе.
+"""
 
 import os
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as element_tree
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-# Имя npm-пакета: строчные буквы, цифры, - . _ ~, возможно с областью @scope/.
 NPM_NAME = re.compile(r"^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$")
-# Имя пакета в тестовом репозитории: большие латинские буквы.
 TEST_NAME = re.compile(r"^[A-Z]+$")
-# Точная версия по SemVer: 1.2.3, 1.2.3-beta.1, 1.2.3+build.
 SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"
@@ -19,7 +23,6 @@ NPM_NAME_MAX = 214
 TRUE_VALUES = ("true", "1", "yes")
 FALSE_VALUES = ("false", "0", "no")
 
-# Порядок параметров в файле и при выводе.
 FIELDS = (
     "package",
     "repository",
@@ -57,11 +60,13 @@ def read_xml(path):
     if not os.path.isfile(path):
         raise ConfigError(f"конфигурационный файл не найден: '{path}'")
     try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError as error:
+        root = element_tree.parse(path).getroot()
+    except element_tree.ParseError as error:
         raise ConfigError(f"некорректный XML в '{path}': {error}") from error
     if root.tag != "config":
-        raise ConfigError(f"корневой элемент должен быть <config>, а не <{root.tag}>")
+        raise ConfigError(
+            f"корневой элемент должен быть <config>, а не <{root.tag}>"
+        )
     values = {}
     for child in root:
         if child.tag not in FIELDS:
@@ -156,7 +161,9 @@ def parse_depth(text):
             f"<max_depth>: ожидается целое число, получено '{text}'"
         ) from None
     if depth < 1:
-        raise ConfigError(f"<max_depth>: глубина должна быть >= 1, получено {depth}")
+        raise ConfigError(
+            f"<max_depth>: глубина должна быть >= 1, получено {depth}"
+        )
     return depth
 
 

@@ -3,6 +3,10 @@
 Используется только стандартная библиотека: метаданные пакета
 (packument) скачиваются по адресу <репозиторий>/<имя пакета> и
 разбираются как JSON. npm и сторонние библиотеки не используются.
+
+ACCEPT запрашивает сокращённый формат метаданных (только то, что нужно
+для установки). NOT_REGISTRY — префиксы спецификаций зависимостей,
+которые указывают не на версию из репозитория (git, файлы, ссылки).
 """
 
 import json
@@ -12,10 +16,9 @@ from urllib.request import Request, urlopen
 
 from semver import RangeError, max_satisfying
 
-# Сокращённый формат метаданных: только то, что нужно для установки.
 ACCEPT = "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8"
 TIMEOUT = 30
-# Префиксы спецификаций, которые не являются версиями из репозитория.
+HTTP_NOT_FOUND = 404
 NOT_REGISTRY = (
     "file:", "link:", "git:", "git+", "github:", "gitlab:", "bitbucket:",
     "http:", "https:", "workspace:", "portal:",
@@ -28,16 +31,20 @@ class RepoError(Exception):
 
 def http_get_json(url):
     """Скачивает документ по URL и разбирает его как JSON."""
-    request = Request(url, headers={"Accept": ACCEPT, "User-Agent": "dep-visual"})
+    headers = {"Accept": ACCEPT, "User-Agent": "dep-visual"}
+    request = Request(url, headers=headers)
     try:
         with urlopen(request, timeout=TIMEOUT) as response:
             body = response.read()
     except HTTPError as error:
-        if error.code == 404:
-            raise RepoError(f"не найдено в репозитории (404): {url}") from error
-        raise RepoError(f"ошибка HTTP {error.code} при запросе {url}") from error
+        if error.code == HTTP_NOT_FOUND:
+            message = f"не найдено в репозитории (404): {url}"
+        else:
+            message = f"ошибка HTTP {error.code} при запросе {url}"
+        raise RepoError(message) from error
     except URLError as error:
-        raise RepoError(f"репозиторий недоступен: {url} ({error.reason})") from error
+        message = f"репозиторий недоступен: {url} ({error.reason})"
+        raise RepoError(message) from error
     except OSError as error:
         raise RepoError(f"ошибка сети при запросе {url}: {error}") from error
     try:
@@ -66,6 +73,7 @@ class NpmRegistry:
     """Доступ к npm-репозиторию с кэшем метаданных пакетов."""
 
     def __init__(self, url, fetch=http_get_json):
+        """Репозиторий по URL; fetch можно подменить в тестах."""
         self.url = url
         self.fetch = fetch
         self.cache = {}
@@ -74,8 +82,11 @@ class NpmRegistry:
         """Метаданные пакета: все версии и метки dist-tags."""
         if name not in self.cache:
             data = self.fetch(package_url(self.url, name))
-            if not isinstance(data, dict) or not isinstance(data.get("versions"), dict):
-                raise RepoError(f"неверный формат метаданных пакета '{name}'")
+            versions = data.get("versions") if isinstance(data, dict) else None
+            if not isinstance(versions, dict):
+                raise RepoError(
+                    f"неверный формат метаданных пакета '{name}'"
+                )
             self.cache[name] = data
         return self.cache[name]
 
@@ -99,7 +110,8 @@ class NpmRegistry:
                 return latest
             found = max_satisfying(versions.keys(), spec)
         except RangeError as error:
-            raise RepoError(f"{name}: некорректный диапазон '{spec}': {error}") from error
+            message = f"{name}: некорректный диапазон '{spec}': {error}"
+            raise RepoError(message) from error
         if found is None:
             raise RepoError(f"{name}: нет версии, подходящей под '{spec}'")
         return found
@@ -128,7 +140,8 @@ class NpmRegistry:
             real_name, real_spec = split_alias(dep_name, str(spec))
             if real_spec.startswith(NOT_REGISTRY) or "/" in real_spec:
                 warnings.append(
-                    f"{node}: зависимость {dep_name}@{spec} не из репозитория, пропущена"
+                    f"{node}: зависимость {dep_name}@{spec} "
+                    "не из репозитория, пропущена"
                 )
                 continue
             try:

@@ -37,7 +37,9 @@ def open_source(config):
     if config.test_mode:
         source = TestRepository(config.repository)
         if not source.has(config.package):
-            raise RepoError(f"пакет '{config.package}' не найден в тестовом репозитории")
+            raise RepoError(
+                f"пакет '{config.package}' не найден в тестовом репозитории"
+            )
         return source, config.package
     source = NpmRegistry(config.repository)
     version = source.resolve(config.package, config.version)
@@ -52,7 +54,8 @@ def print_graph(graph, cycles):
     )
     for node, children in graph.edges.items():
         mark = " (не раскрыт: max_depth)" if node in graph.truncated else ""
-        print(f"  [{graph.depth[node]}] {node} -> {', '.join(children) or '-'}{mark}")
+        targets = ", ".join(children) or "-"
+        print(f"  [{graph.depth[node]}] {node} -> {targets}{mark}")
     if cycles:
         print(f"Циклические зависимости: {len(cycles)}")
         for cycle in cycles:

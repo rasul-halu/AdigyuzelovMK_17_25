@@ -1,3 +1,5 @@
+"""Тесты тестового репозитория и построения графа."""
+
 import unittest
 
 from tests.helpers import data_path, fake_fetch
@@ -7,15 +9,20 @@ from test_repo import TestRepository, parse_graph
 
 
 def repo(name):
+    """Тестовый репозиторий из каталога data."""
     return TestRepository(data_path("data", name))
 
 
 class TestRepoTest(unittest.TestCase):
+    """Разбор файла тестового репозитория."""
+
     def test_parse(self):
+        """Строки 'A: B C' превращаются в граф."""
         graph = parse_graph("# c\nA: B C\nB:\n")
         self.assertEqual(graph, {"A": ["B", "C"], "B": [], "C": []})
 
     def test_errors(self):
+        """Ошибки формата и чтения файла."""
         for text in ["A B", "A: b", "A:\nA:"]:
             with self.assertRaises(RepoError):
                 parse_graph(text)
@@ -26,7 +33,10 @@ class TestRepoTest(unittest.TestCase):
 
 
 class GraphTest(unittest.TestCase):
+    """Обход в ширину, глубина, циклы и порядок загрузки."""
+
     def test_bfs_order_and_depth(self):
+        """Порядок обхода по уровням и глубины узлов."""
         graph = build_graph(repo("graph_simple.txt"), "A", 10)
         self.assertEqual(graph.nodes(), ["A", "B", "C", "D"])
         self.assertEqual(graph.depth, {"A": 0, "B": 1, "C": 1, "D": 2})
@@ -34,6 +44,7 @@ class GraphTest(unittest.TestCase):
         self.assertEqual(find_cycles(graph), [])
 
     def test_max_depth(self):
+        """Узлы глубже max_depth не раскрываются."""
         graph = build_graph(repo("graph_deep.txt"), "A", 2)
         self.assertEqual(graph.nodes(), ["A", "B", "C"])
         self.assertEqual(graph.truncated, {"C"})
@@ -41,12 +52,14 @@ class GraphTest(unittest.TestCase):
         self.assertEqual(graph.nodes(), ["A", "B"])
 
     def test_cycles(self):
+        """Поиск циклов и петли."""
         graph = build_graph(repo("graph_cycle.txt"), "A", 10)
         self.assertEqual(find_cycles(graph), [["A", "B", "C", "A"]])
         graph = build_graph(repo("graph_complex.txt"), "A", 10)
         self.assertEqual(find_cycles(graph), [["B", "D", "B"], ["E", "E"]])
 
     def test_load_order(self):
+        """Зависимости загружаются раньше зависящих."""
         graph = build_graph(repo("graph_simple.txt"), "A", 10)
         self.assertEqual(load_order(graph), ["D", "B", "C", "A"])
         graph = build_graph(repo("graph_cycle.txt"), "A", 10)
@@ -60,6 +73,7 @@ class GraphTest(unittest.TestCase):
                     self.assertLess(order.index(child), order.index(node))
 
     def test_npm_graph_with_cycle(self):
+        """Граф npm с циклом через фиктивный репозиторий."""
         registry = NpmRegistry("https://r", fetch=fake_fetch)
         graph = build_graph(registry, "app@2.0.0", 10)
         self.assertEqual(graph.nodes(), ["app@2.0.0", "lib-a@1.2.0",
